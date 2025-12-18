@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --sidebar-width: 260px;
+    --primary-color: #2563eb;
+    --bg-color: #f8fafc;
+    --sidebar-bg: #0f172a;
+    --text-color: #334155;
+}
+
+body {
+    font-family: 'Sarabun', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    overflow-x: hidden;
+}
+
+/* --- 1. Sidebar Styling (ปรับปรุงใหม่) --- */
+.sidebar {
+    width: var(--sidebar-width);
+    height: 100vh; /* เต็มความสูงจอ */
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: var(--sidebar-bg);
+    color: white;
+    padding: 1.5rem;
+    z-index: 1050;
+    
+    /* Flexbox Layout: ให้ Footer ดันลงล่างสุด */
+    display: flex;
+    flex-direction: column;
+    
+    /* Animation การสไลด์ */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Scrollbar: ถ้าเมนูเยอะให้เลื่อนได้ */
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+/* แต่ง Scrollbar ให้สวยงาม (Webkit) */
+.sidebar::-webkit-scrollbar { width: 5px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+/* ส่วนประกอบใน Sidebar */
+.sidebar-header {
+    flex-shrink: 0; /* ห้ามย่อส่วนหัว */
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.sidebar-menu {
+    flex-grow: 1; /* ส่วนเมนูให้ยืดเต็มพื้นที่ */
+}
+
+.sidebar-footer {
+    flex-shrink: 0; /* ห้ามย่อส่วนท้าย */
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.nav-link {
+    color: #94a3b8;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    display: flex; align-items: center; gap: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap; /* ห้ามตัดคำ */
+}
+
+.nav-link:hover, .nav-link.active {
+    color: white;
+    background-color: rgba(255,255,255,0.1);
+}
+
+/* --- 2. Main Content --- */
+.main-content {
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 2rem;
+}
+
+/* --- 3. Mobile Overlay (ฉากหลังเวลาเปิดเมนูมือถือ) --- */
+.sidebar-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1040;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s;
+    backdrop-filter: blur(2px);
+}
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* --- 4. Responsive Rules --- */
+
+/* Desktop (จอใหญ่กว่า 768px) */
+@media (min-width: 769px) {
+    .sidebar { transform: translateX(0); } /* แสดงเมนูเสมอ */
+    .main-content { margin-left: var(--sidebar-width); } /* เนื้อหาขยับหนีเมนู */
+    .mobile-toggle { display: none !important; } /* ซ่อนปุ่มแฮมเบอร์เกอร์ */
+}
+
+/* Mobile (จอเล็กกว่าหรือเท่ากับ 768px) */
+@media (max-width: 768px) {
+    .sidebar { 
+        transform: translateX(-100%); /* ซ่อนเมนูไปทางซ้าย */
+        box-shadow: none;
+    }
+    .sidebar.show { 
+        transform: translateX(0); /* สไลด์ออกมา */
+        box-shadow: 10px 0 25px rgba(0,0,0,0.2);
+    }
+    .main-content { margin-left: 0; width: 100%; }
+}
+
+/* Utility Classes */
+.card-modern {
+    background: white; border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.bg-gradient-primary { background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%); }

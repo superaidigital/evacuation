@@ -1,0 +1,55 @@
+-- 1. สร้างตาราง User (ผู้ใช้งาน)
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    fullname VARCHAR(100) NOT NULL,
+    role ENUM('ADMIN', 'STAFF') DEFAULT 'STAFF',
+    shelter_id INT NULL, -- ถ้าเป็น Admin จะเป็น NULL, ถ้าเป็น Staff จะเก็บ ID ศูนย์
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. สร้างตาราง Shelters (ศูนย์พักพิงชั่วคราว)
+CREATE TABLE shelters (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    district VARCHAR(100) NOT NULL,
+    province VARCHAR(100) DEFAULT 'ศรีสะเกษ',
+    capacity INT DEFAULT 100,
+    status ENUM('OPEN', 'CLOSED') DEFAULT 'OPEN',
+    current_event VARCHAR(150) NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 3. สร้างตาราง Evacuees (ผู้พักพิง)
+CREATE TABLE evacuees (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    citizen_id VARCHAR(13) NOT NULL,
+    prefix VARCHAR(20),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    age INT,
+    health_condition VARCHAR(255) DEFAULT 'ไม่มี', -- เก็บข้อมูลเช่น ผู้สูงอายุ, ผู้พิการ
+    address TEXT,
+    phone VARCHAR(20),
+    shelter_id INT,
+    check_in_date DATE DEFAULT (CURRENT_DATE),
+    check_out_date DATE NULL,
+    check_out_reason VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (shelter_id) REFERENCES shelters(id)
+);
+
+-- 4. เพิ่มข้อมูลตัวอย่าง (Seed Data)
+
+-- เพิ่มศูนย์พักพิงชั่วคราว
+INSERT INTO shelters (name, district, capacity, status, current_event) VALUES 
+('ศูนย์บ้านจาน', 'กันทรลักษ์', 100, 'OPEN', 'อุทกภัย ต.ค. 2568'),
+('ศูนย์บ้านหนองคู', 'ขุนหาญ', 50, 'OPEN', 'อุทกภัย ต.ค. 2568');
+
+-- เพิ่มผู้ใช้งาน (Password: 123456)
+-- หมายเหตุ: รหัสผ่านในระบบจริงต้องถูก Hash แต่เพื่อการทดสอบเบื้องต้นเราจะใช้ MD5 หรือเพิ่มผ่านหน้าเว็บทีหลัง
+-- ในโค้ด PHP เราจะใช้ password_hash() ซึ่งปลอดภัยกว่า
+INSERT INTO users (username, password, fullname, role, shelter_id) VALUES 
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ผู้ดูแลระบบสูงสุด', 'ADMIN', NULL),
+('staff01', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'จนท. สมชาย (ศูนย์บ้านจาน)', 'STAFF', 1);
