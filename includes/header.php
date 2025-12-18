@@ -7,13 +7,14 @@ if (session_status() == PHP_SESSION_NONE) {
 }
 
 // 2. ตรวจสอบการ Login (ถ้ายังไม่ Login และไม่ได้อยู่ที่หน้า login.php ให้ดีดออก)
-if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php') {
+// ยกเว้นหน้า login_db.php หรือหน้าที่อนุญาต
+$current_page = basename($_SERVER['PHP_SELF']);
+$allowed_pages = ['login.php', 'login_db.php', 'public_dashboard.php', 'monitor_dashboard.php']; 
+
+if (!isset($_SESSION['user_id']) && !in_array($current_page, $allowed_pages)) {
     header("Location: login.php");
     exit();
 }
-
-// 3. ดึงชื่อไฟล์ปัจจุบันเพื่อทำ Active Menu Highlight
-$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -93,7 +94,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
                 <div class="overflow-hidden">
                     <div class="text-white fw-bold text-truncate" style="max-width: 140px; font-size: 0.95rem;">
-                        <?php echo $_SESSION['fullname']; ?>
+                        <?php echo isset($_SESSION['fullname']) ? $_SESSION['fullname'] : $_SESSION['username']; ?>
                     </div>
                     <div class="text-secondary small d-flex align-items-center gap-1">
                         <span class="badge bg-<?php echo $_SESSION['role'] == 'ADMIN' ? 'danger' : 'success'; ?> bg-opacity-25 text-white" style="font-size: 0.65rem;">
@@ -124,6 +125,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 
                 <?php if($_SESSION['role'] == 'ADMIN'): ?>
                     <!-- === ส่วนของ ADMIN === -->
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($current_page == 'event_manager.php') ? 'active' : ''; ?>" href="event_manager.php">
+                            <i class="bi bi-calendar-event"></i> จัดการเหตุการณ์
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link <?php echo ($current_page == 'shelter_list.php' || $current_page == 'shelter_form.php') ? 'active' : ''; ?>" href="shelter_list.php">
                             <i class="bi bi-house-door-fill"></i> จัดการศูนย์พักพิงชั่วคราว
@@ -163,6 +169,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <li class="nav-item">
                     <a class="nav-link <?php echo ($current_page == 'report.php') ? 'active' : ''; ?>" href="report.php">
                         <i class="bi bi-file-earmark-bar-graph-fill"></i> สรุปยอดรายวัน
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo ($current_page == 'event_history.php') ? 'active' : ''; ?>" href="event_history.php">
+                        <i class="bi bi-clock-history"></i> ประวัติเหตุการณ์ภัยพิบัติ
                     </a>
                 </li>
                 <li class="nav-item">
