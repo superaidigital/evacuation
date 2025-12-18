@@ -7,16 +7,37 @@ if ($_SESSION['role'] != 'ADMIN') {
     header("Location: index.php"); exit();
 }
 
-// ดึงข้อมูล User ที่เป็น STAFF พร้อมชื่อศูนย์ที่สังกัด
+// --- 1. รับค่าค้นหาและกรอง ---
+$search = $_GET['search'] ?? '';
+$shelter_filter = $_GET['shelter_id'] ?? 'all';
+
+$params = [];
 $sql = "SELECT u.*, s.name as shelter_name, s.district 
         FROM users u 
         LEFT JOIN shelters s ON u.shelter_id = s.id 
-        WHERE u.role = 'STAFF' 
-        ORDER BY u.id DESC";
-$stmt = $pdo->query($sql);
+        WHERE u.role = 'STAFF'";
+
+if ($search) {
+    $sql .= " AND (u.fullname LIKE :search OR u.username LIKE :search OR u.phone LIKE :search)";
+    $params['search'] = "%$search%";
+}
+
+if ($shelter_filter != 'all') {
+    $sql .= " AND u.shelter_id = :sid";
+    $params['sid'] = $shelter_filter;
+}
+
+$sql .= " ORDER BY u.created_at DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
 $users = $stmt->fetchAll();
+
+// ดึงรายชื่อศูนย์ทั้งหมดเพื่อทำ Filter
+$shelters = $pdo->query("SELECT id, name FROM shelters WHERE status='OPEN'")->fetchAll(PDO::FETCH_KEY_PAIR);
 ?>
 
+<!-- Header Section -->
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
     <div>
         <nav aria-label="breadcrumb">
@@ -25,68 +46,142 @@ $users = $stmt->fetchAll();
                 <li class="breadcrumb-item active">จัดการผู้ใช้งาน</li>
             </ol>
         </nav>
-        <h3 class="fw-bold mb-0 text-dark">ข้อมูลผู้ดูแลศูนย์ (เจ้าหน้าที่)</h3>
-        <span class="text-muted small">จัดการบัญชีผู้ใช้งานและกำหนดสิทธิ์ดูแลศูนย์</span>
+        <h3 class="fw-bold mb-0 text-dark">ข้อมูลผู้ดูแลศูนย์ (Staff)</h3>
+        <span class="text-muted small">พบบัญชีผู้ใช้งานทั้งหมด <?php echo count($users); ?> รายการ</span>
     </div>
     
-    <a href="caretaker_form.php" class="btn btn-primary d-flex align-items-center gap-2 shadow-sm">
+    <a href="caretaker_form.php" class="btn btn-primary d-flex align-items-center gap-2 shadow-sm fw-bold rounded-pill px-4">
         <i class="bi bi-person-plus-fill"></i> 
         <span>เพิ่มผู้ดูแลใหม่</span>
     </a>
 </div>
 
-<div class="card card-modern border-0">
+<!-- Search & Filter Bar -->
+<div class="card card-modern border-0 mb-4 bg-white shadow-sm">
+    <div class="card-body p-3">
+        <form method="GET" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="ค้นหาชื่อ, Username, เบอร์โทร..." value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select name="shelter_id" class="form-select" onchange="this.form.submit()">
+                    <option value="all">🏢 ทุกศูนย์พักพิง</option>
+                    <?php foreach($shelters as $id => $name): ?>
+                        <option value="<?php echo $id; ?>" <?php echo $shelter_filter == $id ? 'selected' : ''; ?>><?php echo $name; ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-dark w-100 fw-bold">กรองข้อมูล</button>
+                    <?php if($search || $shelter_filter != 'all'): ?>
+                        <a href="caretaker_list.php" class="btn btn-light border text-danger" title="ล้างค่า"><i class="bi bi-x-lg"></i></a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Table Section -->
+<div class="card card-modern border-0 shadow-sm overflow-hidden">
     <div class="table-responsive">
-        <table class="table table-custom align-middle mb-0">
-            <thead>
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
                 <tr>
-                    <th class="ps-4">ชื่อ-นามสกุล</th>
-                    <th>Username</th>
-                    <th>ศูนย์ที่รับผิดชอบ</th>
-                    <th>วันที่สร้าง</th>
-                    <th class="text-end pe-4">จัดการ</th>
+                    <th class="ps-4 py-3 text-secondary text-uppercase small fw-bold">เจ้าหน้าที่ / Username</th>
+                    <th class="py-3 text-secondary text-uppercase small fw-bold">ข้อมูลติดต่อ</th>
+                    <th class="py-3 text-secondary text-uppercase small fw-bold">ศูนย์ที่รับผิดชอบ</th>
+                    <th class="py-3 text-secondary text-uppercase small fw-bold">วันที่สร้าง</th>
+                    <th class="py-3 text-end pe-4 text-secondary text-uppercase small fw-bold" style="min-width: 140px;">จัดการ</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (count($users) > 0): ?>
-                    <?php foreach ($users as $row): ?>
+                    <?php foreach ($users as $row): 
+                        $avatar_char = mb_substr($row['fullname'], 0, 1);
+                        // สุ่มสี Avatar จาก ID
+                        $colors = ['primary', 'success', 'warning', 'info', 'danger', 'secondary'];
+                        $color = $colors[$row['id'] % count($colors)];
+                    ?>
                         <tr>
-                            <td class="ps-4 fw-bold text-primary">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center text-secondary" style="width: 32px; height: 32px;">
-                                        <i class="bi bi-person-fill"></i>
+                            <td class="ps-4 py-3">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="rounded-circle bg-<?php echo $color; ?> bg-opacity-10 text-<?php echo $color; ?> d-flex align-items-center justify-content-center fw-bold shadow-sm" 
+                                         style="width: 45px; height: 45px; font-size: 1.2rem;">
+                                        <?php echo $avatar_char; ?>
                                     </div>
-                                    <?php echo $row['fullname']; ?>
+                                    <div>
+                                        <div class="fw-bold text-dark"><?php echo $row['fullname']; ?></div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-light text-secondary border font-monospace small">
+                                                <i class="bi bi-person-lock me-1"></i><?php echo $row['username']; ?>
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
-                            <td class="font-monospace text-secondary"><?php echo $row['username']; ?></td>
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    <?php if($row['phone']): ?>
+                                        <div class="small text-dark">
+                                            <i class="bi bi-telephone-fill text-success me-2"></i><?php echo $row['phone']; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if($row['email']): ?>
+                                        <div class="small text-muted">
+                                            <i class="bi bi-envelope-fill text-primary me-2"></i><?php echo $row['email']; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if(!$row['phone'] && !$row['email']): ?>
+                                        <span class="text-muted small">- ไม่ระบุ -</span>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
                             <td>
                                 <?php if ($row['shelter_name']): ?>
-                                    <span class="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25">
-                                        <i class="bi bi-house-door me-1"></i> <?php echo $row['shelter_name']; ?>
-                                    </span>
-                                    <small class="text-muted ms-1">(อ.<?php echo $row['district']; ?>)</small>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-building-fill text-warning"></i>
+                                        <div>
+                                            <div class="text-dark small fw-bold"><?php echo $row['shelter_name']; ?></div>
+                                            <div class="text-muted" style="font-size: 0.75rem;">อ.<?php echo $row['district']; ?></div>
+                                        </div>
+                                    </div>
                                 <?php else: ?>
                                     <span class="badge bg-secondary bg-opacity-10 text-secondary">ไม่ระบุศูนย์</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-muted small">
-                                <?php echo date('d/m/Y', strtotime($row['created_at'])); ?>
+                            <td>
+                                <div class="text-dark small fw-bold"><?php echo date('d/m/y', strtotime($row['created_at'])); ?></div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <?php echo date('H:i', strtotime($row['created_at'])); ?> น.
+                                </div>
                             </td>
                             <td class="text-end pe-4">
-                                <a href="caretaker_form.php?id=<?php echo $row['id']; ?>" 
-                                   class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1" title="แก้ไข">
-                                    <i class="bi bi-pencil-square"></i> แก้ไข
-                                </a>
-                                <button onclick="confirmDeleteUser(<?php echo $row['id']; ?>)" 
-                                        class="btn btn-sm btn-outline-danger rounded-pill px-3" title="ลบ">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <div class="d-flex justify-content-end gap-1">
+                                    <?php if($row['phone']): ?>
+                                        <a href="tel:<?php echo $row['phone']; ?>" class="btn btn-sm btn-light border text-success" data-bs-toggle="tooltip" title="โทรออก">
+                                            <i class="bi bi-telephone-fill"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                    
+                                    <a href="caretaker_form.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-light border text-primary" data-bs-toggle="tooltip" title="แก้ไขข้อมูล">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                    
+                                    <button onclick="confirmDeleteUser(<?php echo $row['id']; ?>, '<?php echo $row['username']; ?>')" 
+                                            class="btn btn-sm btn-light border text-danger" data-bs-toggle="tooltip" title="ลบบัญชี">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <tr><td colspan="5" class="text-center py-5 text-muted">ไม่พบข้อมูลผู้ดูแลระบบ</td></tr>
+                    <tr><td colspan="5" class="text-center py-5 text-muted bg-light">ไม่พบข้อมูลผู้ดูแลระบบตามเงื่อนไข</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -94,10 +189,18 @@ $users = $stmt->fetchAll();
 </div>
 
 <script>
-function confirmDeleteUser(id) {
+// Initialize Tooltips
+document.addEventListener('DOMContentLoaded', function () {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+});
+
+function confirmDeleteUser(id, username) {
     Swal.fire({
-        title: 'ยืนยันการลบ?',
-        text: "บัญชีผู้ใช้นี้จะไม่สามารถเข้าสู่ระบบได้อีก",
+        title: 'ยืนยันการลบบัญชี?',
+        html: `คุณต้องการลบผู้ใช้งาน <b>${username}</b> ใช่หรือไม่?<br><small class="text-danger">การกระทำนี้ไม่สามารถย้อนกลับได้</small>`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',

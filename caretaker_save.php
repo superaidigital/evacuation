@@ -2,23 +2,36 @@
 // caretaker_save.php
 require_once 'config/db.php';
 
-if ($_SESSION['role'] != 'ADMIN') { header("Location: index.php"); exit(); }
+// ตรวจสอบสิทธิ์ Admin
+if (!isset($_SESSION['role']) || $_SESSION['role'] != 'ADMIN') { 
+    header("Location: index.php"); 
+    exit(); 
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $mode = $_POST['mode'];
     $id = $_POST['id'] ?? '';
     
-    // รับค่าข้อมูล
+    // รับค่าข้อมูลทั่วไป
     $fullname = trim($_POST['fullname']);
     $phone = trim($_POST['phone']);
     $email = trim($_POST['email']);
+    
+    // รับค่า Login & Role
     $username = trim($_POST['username']);
     $password = $_POST['password'];
-    $shelter_id = $_POST['shelter_id'];
-    $role = 'STAFF'; 
+    $role = $_POST['role'] ?? 'STAFF'; // รับค่า Role จากฟอร์ม (ถ้าไม่มี Default เป็น STAFF)
+    $shelter_id = $_POST['shelter_id'] ?? null;
+
+    // Logic: ถ้าเป็น ADMIN ให้ shelter_id เป็น NULL เสมอ
+    if ($role === 'ADMIN') {
+        $shelter_id = null;
+    }
 
     try {
         if ($mode == 'add') {
+            // --- โหมดเพิ่มใหม่ ---
+            
             // 1. ตรวจสอบ Username ซ้ำ
             $check = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
             $check->execute([$username]);
@@ -29,25 +42,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             
-            // INSERT (เพิ่ม phone, email)
+            // INSERT (เพิ่ม role และ shelter_id ที่ผ่าน Logic แล้ว)
             $sql = "INSERT INTO users (username, password, fullname, phone, email, role, shelter_id) 
                     VALUES (?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$username, $hashed_password, $fullname, $phone, $email, $role, $shelter_id]);
 
         } else {
-            // โหมดแก้ไข
+            // --- โหมดแก้ไข ---
+            
             if (!empty($password)) {
+                // กรณีมีการเปลี่ยนรหัสผ่าน
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                // UPDATE มีรหัสผ่าน (เพิ่ม phone, email)
-                $sql = "UPDATE users SET fullname=?, phone=?, email=?, shelter_id=?, password=? WHERE id=?";
+                $sql = "UPDATE users SET fullname=?, phone=?, email=?, role=?, shelter_id=?, password=? WHERE id=?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$fullname, $phone, $email, $shelter_id, $hashed_password, $id]);
+                $stmt->execute([$fullname, $phone, $email, $role, $shelter_id, $hashed_password, $id]);
             } else {
-                // UPDATE ไม่แก้รหัสผ่าน (เพิ่ม phone, email)
-                $sql = "UPDATE users SET fullname=?, phone=?, email=?, shelter_id=? WHERE id=?";
+                // กรณีไม่เปลี่ยนรหัสผ่าน
+                $sql = "UPDATE users SET fullname=?, phone=?, email=?, role=?, shelter_id=? WHERE id=?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$fullname, $phone, $email, $shelter_id, $id]);
+                $stmt->execute([$fullname, $phone, $email, $role, $shelter_id, $id]);
             }
         }
 
@@ -56,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     } catch (PDOException $e) {
         echo "Error: " . $e->getMessage();
+        echo "<br><a href='javascript:history.back()'>กลับไปแก้ไข</a>";
     }
 }
 ?>
